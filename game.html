@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        canvas {
+            border: 1px solid #d3d3d3;
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+
+<body onload="startGame()">
+    <script>
+
+        var myGamePiece;
+        var myObstacles = [];
+        var myScore;
+
+        function startGame() {
+            myGamePiece = new component(30, 30, "red", 10, 120);
+            myScore = new component("30px", "Consolas", "black", 280, 40, "text");
+            // myStage: Componente de texto determinando a fase (FASE 1, FASE 2)
+            myStage = new component("30px", "Consolas", "black", 80, 40, "text");
+            // gameOver: Componente de texto de GAME OVER. Somente exibido na colisão com 0 score.
+            gameOver = new component("30px", "Consolas", "black", 140, 135, "text");
+            myGameArea.start();
+        }
+
+        var myGameArea = {
+            canvas: document.createElement("canvas"),
+            stage: 1, // stage: número da fase atual
+            maxStages: 5, // maxStages: número máximo de fases
+            score: 0, // score: score inicial
+            start: function () {
+                this.canvas.width = 480;
+                this.canvas.height = 270;
+                this.context = this.canvas.getContext("2d");
+                document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                this.frameNo = 0;
+                this.interval = setInterval(updateGameArea, 20);
+                // cada vez que o usuário digita um botão no teclado
+                // o código do botão é adicionado na variável myGameArea.key
+                window.addEventListener('keydown', function (e) {
+                    myGameArea.key = e.keyCode;
+                })
+                // se o usuário para de apertar, a variável recebe false
+                window.addEventListener('keyup', function (e) {
+                    myGameArea.key = false;
+                })
+            },
+            clear: function () {
+                this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            },
+            stop: function () {
+                clearInterval(this.interval);
+            }
+        }
+
+        function component(width, height, color, x, y, type) {
+            this.type = type;
+            this.width = width;
+            this.height = height;
+            this.speedX = 0;
+            this.speedY = 0;
+            this.x = x;
+            this.y = y;
+            this.sp = false; // sp: surpassed, indica que esse componente obstáculo foi ultrapassado
+            this.crashed = false; // crashed, indica que esse componente obstáculo sofreu colisão
+            this.update = function () {
+                ctx = myGameArea.context;
+                if (this.type == "text") {
+                    ctx.font = this.width + " " + this.height;
+                    ctx.fillStyle = color;
+                    ctx.fillText(this.text, this.x, this.y);
+                } else {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            this.newPos = function () {
+                this.x += this.speedX;
+                this.y += this.speedY;
+            }
+            this.crashWith = function (otherobj) {
+                var myleft = this.x;
+                var myright = this.x + (this.width);
+                var mytop = this.y;
+                var mybottom = this.y + (this.height);
+                var otherleft = otherobj.x;
+                var otherright = otherobj.x + (otherobj.width);
+                var othertop = otherobj.y;
+                var otherbottom = otherobj.y + (otherobj.height);
+                var crash = true;
+                if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+                    crash = false;
+                }
+                return crash;
+            }
+            // função para calcular se o componente sofreu colisão com o objeto otherobj
+            this.surpassed = function (otherobj) {
+                var myleft = this.x;
+                var otherright = otherobj.x + (otherobj.width);
+                var surpassed = false;
+                if (myleft > otherright) {
+                    surpassed = true;
+                }
+                return surpassed;
+            }
+        }
+
+        // função para atualizar a área de jogo, chamada a cada frame
+        function updateGameArea() {
+            var x, y, height;
+            // para cada componente obstáculo
+            for (i = 0; i < myObstacles.length; i += 1) {
+                // se o quadrado vermelho sofreu colisão com esse componente obstáculo
+                if (myGamePiece.crashWith(myObstacles[i])) {
+                    // o componente obstáculo modifica a variável crashed para true, indicando que sofreu colisão
+                    myObstacles[i].crashed = true;
+                    // se o score for menor ou igual a zero
+                    if (myGameArea.score <= 0) {
+                        // GAME OVER
+                        myGameArea.stop();
+                        gameOver.text = "GAME OVER";
+                        gameOver.update();
+                        return;
+                    } else {
+                        // senão, o score é diminuído e o obstáculo é removido da lista de componentes
+                        myGameArea.score -= 1;
+                        myObstacles.splice(i, 1);
+                        continue;
+                    }
+                }
+                // se o quadrado vermelho ultrapassou o componente obstáculo
+                if (myGamePiece.surpassed(myObstacles[i])) {
+                    // se o componente obstáculo ainda não foi ultrapassado e não sofreu colisão
+                    if (!myObstacles[i].sp && !myObstacles[i].crashed) {
+                        // sp do componente obstáculo é modificado para true, indicado a ultrapassagem. score + 1
+                        myObstacles[i].sp = true;
+                        myGameArea.score += 1;
+                    }
+                }
+            }
+            myGameArea.clear();
+            myGameArea.frameNo += 1;
+            // se o score do jogo chegar a 100
+            if (myGameArea.score >= 100) {
+                // se for a última fase do jogo: PARABÉNS!
+                if (myGameArea.stage === myGameArea.maxStages) {
+                    myGameArea.stop();
+                    gameOver.text = "PARABÉNS!";
+                    gameOver.update();
+                    // senão, score é zerado e a próxima fase começa
+                } else {
+                    myGameArea.score = 0;
+                    myGameArea.frameNo = 0;
+                    myGameArea.stage += 1;
+                }
+                return;
+            }
+            // checagem para adicionar novos obstáculos
+            // cálculo de frequência utilizando a função everyinterval e o número da fase atual
+            // quanto maior a fase atual, mais frequentes os novos obstáculos a cada frame
+            if (myGameArea.frameNo == 1 || everyinterval((myGameArea.maxStages) * 20 / myGameArea.stage)) {
+                x = myGameArea.canvas.width;
+                y = myGameArea.canvas.height;
+                height = Math.floor(Math.random() * (y - 10 + 1));
+                myObstacles.push(new component(10, 10, "blue", x, height));
+            }
+            for (i = 0; i < myObstacles.length; i += 1) {
+                myObstacles[i].speedX = -1;
+                myObstacles[i].newPos();
+                myObstacles[i].update();
+            }
+            // atualiza o número da fase
+            myStage.text = "FASE " + myGameArea.stage;
+            myStage.update();
+            // atualiza o score
+            myScore.text = "SCORE: " + myGameArea.score;
+            myScore.update();
+            // adiciona os controles do teclado
+            controls();
+            myGamePiece.newPos();
+            myGamePiece.update();
+        }
+
+        function everyinterval(n) {
+            if ((myGameArea.frameNo / n) % 1 == 0) { return true; }
+            return false;
+        }
+
+        // função para adicionar a checagem de controles pelo teclado.
+        // se algum dos direcionais for selecionado, a direção do quadrado vermelho muda.
+        function controls() {
+            if (myGameArea.key && myGameArea.key == 38) myGamePiece.speedY = -1;
+            else if (myGameArea.key && myGameArea.key == 40) myGamePiece.speedY = 1;
+            else if (myGameArea.key && myGameArea.key == 37) myGamePiece.speedX = -1;
+            else if (myGameArea.key && myGameArea.key == 39) myGamePiece.speedX = 1;
+            else {
+                myGamePiece.speedX = 0;
+                myGamePiece.speedY = 0;
+            }
+        }
+    </script>
+
+    <p>Utilize os botões direcionais do seu teclado pra movimentar o quadrado vermelho.</p>
+    <p>O jogo possui 5 fases. O objetivo é chegar em 100 pontos em cada fase.</p>
+</body>
+
+</html>
